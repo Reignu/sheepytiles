@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import TileComponent from './Tile';
 import { Tile } from '../types';
+import { getLayerOffset } from '../heartStack';
 
 interface GameBoardProps {
   mainPile: Tile[];
@@ -28,6 +29,7 @@ const GameBoard: React.FC<GameBoardProps> = ({
   onReorderStack
 }) => {
   const [dragTileIndex, setDragTileIndex] = useState<number | null>(null);
+  const TILE_SIZE = 60;
 
   // Check if there are potential matches in the player stack
   const findPotentialMatches = () => {
@@ -194,14 +196,15 @@ const GameBoard: React.FC<GameBoardProps> = ({
       <div className="main-pile-grid" style={{ position: 'relative', width: 320, height: 400 }}>
         {Object.keys(layers).map(zStr => {
           const z = Number(zStr);
+          const layerOffset = getLayerOffset(z);
           return layers[z].map(tile => (
             <div
               key={tile.id}
               className={`tile-wrapper main-pile-tile`}
               style={{
                 position: 'absolute',
-                left: (tile.x! * 60) + (z * 5),
-                top: (tile.y! * 60) + (z * 5),
+                left: (tile.x! + layerOffset.x) * TILE_SIZE,
+                top: (tile.y! + layerOffset.y) * TILE_SIZE,
                 zIndex: 1 + z,
                 pointerEvents: tile.covered ? 'none' : 'auto',
                 borderRadius: 8,
@@ -243,22 +246,26 @@ const GameBoard: React.FC<GameBoardProps> = ({
       <div className="pile left-pile">
         {renderSidePile(leftPile, true)}
       </div>
-      
-      {/* Main area with revealed tiles, main pile, and player stack */}
+
+      {/* Main pile grid only */}
       <div className="main-area">
         {renderMainPileGrid()}
-        {renderRevealedTiles()}
-        <div 
-          className={`pile player-stack ${playerStackStatus}`}
-          onDragOver={handleDragOver}
-        >
-          {renderPlayerStack()}
-        </div>
       </div>
-      
+
       {/* Right Pile - Rendered vertically */}
       <div className="pile right-pile">
         {renderSidePile(rightPile, false)}
+      </div>
+
+      {/* Second row: revealed tiles and player stack */}
+      <div className="revealed-tiles-area">
+        {renderRevealedTiles()}
+      </div>
+      <div 
+        className={`pile player-stack ${playerStackStatus}`}
+        onDragOver={handleDragOver}
+      >
+        {renderPlayerStack()}
       </div>
     </div>
   );

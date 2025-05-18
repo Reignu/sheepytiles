@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import GameBoard from './components/GameBoard';
 import { Tile, TileType, GameState } from './types';
 import './App.css';
+import { generateHeartStack } from './heartStack';
 
 // Helper function to shuffle an array
 const shuffleArray = <T,>(array: T[]): T[] => {
@@ -32,21 +33,6 @@ const GRID_COLS = 5;
 const MAIN_PILE_SIZE = GRID_LAYERS * GRID_ROWS * GRID_COLS; // 270
 const SIDE_PILE_SIZE = 15;
 
-// Pixel heart mask (1 = tile, 0 = empty), 13x8 grid
-const HEART_MASK = [
-  [0,0,1,1,1,0,0,0,0,1,1,1,0],
-  [0,1,1,1,1,1,0,0,1,1,1,1,1],
-  [1,1,1,1,1,1,1,1,1,1,1,1,1],
-  [1,1,1,1,1,1,1,1,1,1,1,1,1],
-  [0,1,1,1,1,1,1,1,1,1,1,1,0],
-  [0,0,1,1,1,1,1,1,1,1,1,0,0],
-  [0,0,0,1,1,1,1,1,1,1,0,0,0],
-  [0,0,0,0,1,1,1,1,1,0,0,0,0],
-];
-const HEART_WIDTH = 13;
-const HEART_HEIGHT = 8;
-const HEART_LAYERS = 3; // Number of layers to stack
-
 const generateTiles = (): Tile[] => {
   const tiles: Tile[] = [];
   // 30 of each type
@@ -60,28 +46,6 @@ const generateTiles = (): Tile[] => {
     }
   });
   return shuffleArray(tiles);
-};
-
-const generateMainPileHeart = (tiles: Tile[]): Tile[] => {
-  const heartTiles: Tile[] = [];
-  let tileIdx = 0;
-  for (let z = 0; z < HEART_LAYERS; z++) {
-    for (let y = 0; y < HEART_HEIGHT; y++) {
-      for (let x = 0; x < HEART_WIDTH; x++) {
-        if (HEART_MASK[y][x] === 1 && tileIdx < tiles.length) {
-          heartTiles.push({
-            ...tiles[tileIdx],
-            x,
-            y,
-            z,
-            covered: false,
-          });
-          tileIdx++;
-        }
-      }
-    }
-  }
-  return heartTiles;
 };
 
 const STACK_LIMIT = 8; // Maximum tiles in player stack
@@ -119,7 +83,7 @@ const App: React.FC = () => {
   // Start a new game
   const startNewGame = () => {
     const tiles = generateTiles();
-    const mainPileHeart = generateMainPileHeart(tiles);
+    const mainPileHeart = generateHeartStack(tiles);
     const initialState: GameState = {
       mainPile: mainPileHeart,
       leftPile: tiles.slice(mainPileHeart.length, mainPileHeart.length + SIDE_PILE_SIZE),
@@ -177,21 +141,18 @@ const App: React.FC = () => {
     return { ...tile, isMoving: true };
   };
 
-  // Update covered status for all main pile tiles
+  // Geometric overlap detection for covered logic
   const updateCoveredStatus = (mainPile: Tile[]): Tile[] => {
-    // Find the highest z for each (x, y)
-    const topTiles = new Map<string, number>();
-    mainPile.forEach(tile => {
-      const key = `${tile.x},${tile.y}`;
-      if (!topTiles.has(key) || tile.z! > topTiles.get(key)!) {
-        topTiles.set(key, tile.z!);
-      }
-    });
-    return mainPile.map(tile => {
-      const key = `${tile.x},${tile.y}`;
-      const isCovered = tile.z! < topTiles.get(key)!;
-      return { ...tile, covered: isCovered };
-    });
+    return mainPile.map(tile => ({
+      ...tile,
+      covered: mainPile.some(
+        t =>
+          t !== tile &&
+          t.z! < tile.z! &&
+          Math.abs(t.x! - tile.x!) <= 1 &&
+          Math.abs(t.y! - tile.y!) <= 1
+      ),
+    }));
   };
 
   // Handle tile click from main pile with animation
