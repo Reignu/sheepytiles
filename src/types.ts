@@ -1,4 +1,14 @@
-export type TileType = 'puppy' | 'ball' | 'bone';
+export type TileType =
+  | 'puppy'
+  | 'ball'
+  | 'bone'
+  | 'flamingo'
+  | 'elephant'
+  | 'snail'
+  | 'rhino'
+  | 'panda'
+  | 'monkey'
+  | 'toucan';
 
 export interface Tile {
   id: string;
@@ -6,6 +16,10 @@ export interface Tile {
   image: string; // URL to tile images
   isMoving?: boolean; // For animation
   isShuffle?: boolean; // For shuffle animation
+  x?: number; // grid column
+  y?: number; // grid row
+  z?: number; // layer
+  covered?: boolean;
 }
 
 export interface GameState {

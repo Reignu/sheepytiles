@@ -3,13 +3,16 @@ import { Tile, TileType } from '../types';
 
 // Map tile types to their image paths
 const TILE_IMAGES: Record<TileType, string[]> = {
-  puppy: [
-    '/img/sheepy-sticker.jpg',
-    '/img/puppy-2.jpg',
-    '/img/puppy-3.jpg' // Add all your puppy images
-  ],
-  ball: ['/img/ball-1.jpg'],
-  bone: ['/img/bone-1.jpg']
+  puppy: ['/img/sheepy-sticker.jpg'],
+  ball: [],
+  bone: [],
+  flamingo: [],
+  elephant: [],
+  snail: [],
+  rhino: [],
+  panda: [],
+  monkey: [],
+  toucan: [],
 };
 
 export function generateTiles(): Tile[] {

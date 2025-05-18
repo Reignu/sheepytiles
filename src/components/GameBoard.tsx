@@ -90,24 +90,26 @@ const GameBoard: React.FC<GameBoardProps> = ({
     if (pile.length === 0) {
       return <div className="empty-pile">Pile empty</div>;
     }
-    
     return (
       <div className="side-pile-wrapper">
         <div className="pile-count">{pile.length}</div>
         <div className="stacked-tiles">
-          {/* Show only visible tiles (max 8) */}
-          {pile.slice(-8).map((tile, idx) => (
-            <div 
-              key={tile.id} 
-              className={`stacked-tile ${tile.isShuffle ? 'shuffling' : ''}`}
-              onClick={() => onSidePileClick(isPileLeft ? 'left' : 'right', pile.length - 1)}
-            >
-              <TileComponent 
-                tile={tile} 
-                onClick={() => onSidePileClick(isPileLeft ? 'left' : 'right', pile.length - 1)}
-              />
-            </div>
-          ))}
+          {pile.slice(-8).map((tile, idx, arr) => {
+            const isTop = idx === arr.length - 1;
+            return (
+              <div 
+                key={tile.id} 
+                className={`stacked-tile ${tile.isShuffle ? 'shuffling' : ''} ${isTop ? 'topmost' : ''}`}
+                onClick={isTop ? () => onSidePileClick(isPileLeft ? 'left' : 'right', pile.length - 1) : undefined}
+                style={{ cursor: isTop ? 'pointer' : 'default', opacity: isTop ? 1 : 0.7 }}
+              >
+                <TileComponent 
+                  tile={tile} 
+                  onClick={isTop ? () => onSidePileClick(isPileLeft ? 'left' : 'right', pile.length - 1) : undefined}
+                />
+              </div>
+            );
+          })}
         </div>
       </div>
     );
@@ -176,6 +178,62 @@ const GameBoard: React.FC<GameBoardProps> = ({
     );
   };
   
+  // Render the main pile as a grid, stacking tiles by z-index
+  const renderMainPileGrid = () => {
+    if (mainPile.length === 0) {
+      return <div className="empty-pile">Main pile empty</div>;
+    }
+    // Group tiles by z (layer)
+    const layers: Record<number, Tile[]> = {};
+    mainPile.forEach(tile => {
+      if (!layers[tile.z!]) layers[tile.z!] = [];
+      layers[tile.z!].push(tile);
+    });
+    // Render each layer, stacking by z-index
+    return (
+      <div className="main-pile-grid" style={{ position: 'relative', width: 320, height: 400 }}>
+        {Object.keys(layers).map(zStr => {
+          const z = Number(zStr);
+          return layers[z].map(tile => (
+            <div
+              key={tile.id}
+              className={`tile-wrapper main-pile-tile`}
+              style={{
+                position: 'absolute',
+                left: (tile.x! * 60) + (z * 5),
+                top: (tile.y! * 60) + (z * 5),
+                zIndex: 1 + z,
+                pointerEvents: tile.covered ? 'none' : 'auto',
+                borderRadius: 8,
+              }}
+              onClick={tile.covered ? undefined : () => onMainPileClick(mainPile.findIndex(t => t.id === tile.id))}
+            >
+              <TileComponent tile={tile} />
+              {tile.covered && (
+                <div
+                  className="tile-covered-overlay"
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    width: '100%',
+                    height: '100%',
+                    background: 'rgba(60,60,60,0.65)',
+                    borderRadius: 8,
+                    zIndex: 10,
+                    pointerEvents: 'none',
+                    border: '2px solid #888',
+                    boxSizing: 'border-box',
+                  }}
+                />
+              )}
+            </div>
+          ));
+        })}
+      </div>
+    );
+  };
+  
   const potentialMatches = findPotentialMatches();
   const playerStackStatus = getPlayerStackStatus();
   
@@ -186,30 +244,10 @@ const GameBoard: React.FC<GameBoardProps> = ({
         {renderSidePile(leftPile, true)}
       </div>
       
-      {/* Main area with revealed tiles and main pile */}
+      {/* Main area with revealed tiles, main pile, and player stack */}
       <div className="main-area">
+        {renderMainPileGrid()}
         {renderRevealedTiles()}
-        
-        <div className={`pile main-pile ${isShuffling ? 'shuffling' : ''}`}>
-          {mainPile.length > 0 ? (
-            mainPile.map((tile, index) => (
-              <div 
-                key={tile.id}
-                className={`tile-wrapper ${tile.isShuffle ? 'shuffling' : ''}`}
-              >
-                <TileComponent 
-                  key={tile.id} 
-                  tile={tile} 
-                  onClick={() => onMainPileClick(index)} 
-                />
-              </div>
-            ))
-          ) : (
-            <div className="empty-pile">Main pile empty</div>
-          )}
-        </div>
-        
-        {/* Player Stack */}
         <div 
           className={`pile player-stack ${playerStackStatus}`}
           onDragOver={handleDragOver}

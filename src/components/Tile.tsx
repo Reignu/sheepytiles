@@ -8,19 +8,25 @@ interface TileComponentProps {
   isMatching?: boolean;
 }
 
+const getTileColor = (type: TileType) => {
+  switch (type) {
+    case 'puppy': return '#f8f9fa';
+    case 'ball': return '#ffe082';
+    case 'bone': return '#d7ccc8';
+    case 'flamingo': return '#ffb6b9';
+    case 'elephant': return '#b0bec5';
+    case 'snail': return '#c5e1a5';
+    case 'rhino': return '#bdbdbd';
+    case 'panda': return '#e0e0e0';
+    case 'monkey': return '#bcaaa4';
+    case 'toucan': return '#b2dfdb';
+    default: return '#f5f5f5';
+  }
+};
+
 const TileComponent: React.FC<TileComponentProps> = ({ tile, onClick, isMatching = false }) => {
   const [imageError, setImageError] = useState(false);
   
-  // Create a color based on the tile type for consistent tiles
-  const getTileColor = () => {
-    switch(tile.type) {
-      case 'puppy': return '#f8f9fa';
-      case 'ball': return '#e8f5e9';
-      case 'bone': return '#efebe9';
-      default: return '#f5f5f5';
-    }
-  };
-
   // Determine animation classes
   const getAnimationClasses = () => {
     const classes = [];
@@ -45,14 +51,16 @@ const TileComponent: React.FC<TileComponentProps> = ({ tile, onClick, isMatching
         display: 'flex',
         justifyContent: 'center',
         alignItems: 'center',
-        backgroundColor: getTileColor(),
+        backgroundColor: tile.image && !imageError ? undefined : getTileColor(tile.type),
         boxShadow: isMatching 
           ? '0 4px 12px rgba(76, 175, 80, 0.5)' 
           : '0 2px 4px rgba(0,0,0,0.1)',
         transition: 'all 0.2s ease',
         transform: isMatching 
           ? 'translateY(-5px)' 
-          : (onClick ? 'scale(1)' : 'none'),
+          : onClick
+          ? 'scale(1)'
+          : 'none',
       }}
       onMouseOver={(e) => {
         if (onClick) {
@@ -69,7 +77,7 @@ const TileComponent: React.FC<TileComponentProps> = ({ tile, onClick, isMatching
         }
       }}
     >
-      {!imageError && tile.image && tile.image.includes('sheepy-sticker.jpg') ? (
+      {tile.image && !imageError ? (
         <img 
           src={tile.image} 
           alt={tile.type}
@@ -79,14 +87,11 @@ const TileComponent: React.FC<TileComponentProps> = ({ tile, onClick, isMatching
             objectFit: 'contain',
             borderRadius: '4px'
           }}
-          onError={(e) => {
-            console.error('Failed to load:', tile.image);
-            setImageError(true);
-          }}
+          onError={() => setImageError(true)}
         />
       ) : (
-        <div className={`tile-placeholder ${tile.type}`}>
-          {tile.type}
+        <div className={`tile-placeholder ${tile.type}`} style={{ fontWeight: 600, fontSize: 16, color: '#333', textTransform: 'capitalize' }}>
+          {tile.type.replace('_', ' ')}
         </div>
       )}
     </div>

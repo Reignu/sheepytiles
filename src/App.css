@@ -293,7 +293,7 @@ h1 {
   flex-direction: column;
   justify-content: center;
   align-items: center;
-  z-index: 100;
+  z-index: 9999;
   color: white;
   text-align: center;
 }

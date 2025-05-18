@@ -13,32 +13,75 @@ const shuffleArray = <T,>(array: T[]): T[] => {
   return newArray;
 };
 
+const TILE_TYPES: TileType[] = [
+  'puppy',
+  'ball',
+  'bone',
+  'flamingo',
+  'elephant',
+  'snail',
+  'rhino',
+  'panda',
+  'monkey',
+  'toucan',
+];
+
+const GRID_LAYERS = 9;
+const GRID_ROWS = 6;
+const GRID_COLS = 5;
+const MAIN_PILE_SIZE = GRID_LAYERS * GRID_ROWS * GRID_COLS; // 270
+const SIDE_PILE_SIZE = 15;
+
+// Pixel heart mask (1 = tile, 0 = empty), 13x8 grid
+const HEART_MASK = [
+  [0,0,1,1,1,0,0,0,0,1,1,1,0],
+  [0,1,1,1,1,1,0,0,1,1,1,1,1],
+  [1,1,1,1,1,1,1,1,1,1,1,1,1],
+  [1,1,1,1,1,1,1,1,1,1,1,1,1],
+  [0,1,1,1,1,1,1,1,1,1,1,1,0],
+  [0,0,1,1,1,1,1,1,1,1,1,0,0],
+  [0,0,0,1,1,1,1,1,1,1,0,0,0],
+  [0,0,0,0,1,1,1,1,1,0,0,0,0],
+];
+const HEART_WIDTH = 13;
+const HEART_HEIGHT = 8;
+const HEART_LAYERS = 3; // Number of layers to stack
+
 const generateTiles = (): Tile[] => {
-  const types: TileType[] = ['puppy', 'ball', 'bone'];
   const tiles: Tile[] = [];
-
-  // Generate 30 tiles (10 of each type) for a balanced game
+  // 30 of each type
+  TILE_TYPES.forEach((type) => {
   for (let i = 0; i < 30; i++) {
-    const typeIndex = Math.floor(i / 10);
-    const type = types[typeIndex];
-    
-    // For puppy tiles, use our sheepy-sticker.jpg image
-    let imagePath = '';
-    if (type === 'puppy') {
-      imagePath = '/img/sheepy-sticker.jpg';
-    } else {
-      // For other types, we'll use CSS placeholders
-      imagePath = ''; // Empty string will trigger the placeholder
-    }
-    
     tiles.push({
-      id: `tile-${i}`,
+        id: `${type}-${i}`,
       type,
-      image: imagePath
-    });
-  }
-
+        image: '',
+      });
+    }
+  });
   return shuffleArray(tiles);
+};
+
+const generateMainPileHeart = (tiles: Tile[]): Tile[] => {
+  const heartTiles: Tile[] = [];
+  let tileIdx = 0;
+  for (let z = 0; z < HEART_LAYERS; z++) {
+    for (let y = 0; y < HEART_HEIGHT; y++) {
+      for (let x = 0; x < HEART_WIDTH; x++) {
+        if (HEART_MASK[y][x] === 1 && tileIdx < tiles.length) {
+          heartTiles.push({
+            ...tiles[tileIdx],
+            x,
+            y,
+            z,
+            covered: false,
+          });
+          tileIdx++;
+        }
+      }
+    }
+  }
+  return heartTiles;
 };
 
 const STACK_LIMIT = 8; // Maximum tiles in player stack
@@ -76,10 +119,11 @@ const App: React.FC = () => {
   // Start a new game
   const startNewGame = () => {
     const tiles = generateTiles();
+    const mainPileHeart = generateMainPileHeart(tiles);
     const initialState: GameState = {
-      mainPile: tiles.slice(0, 14),
-      leftPile: tiles.slice(14, 22),
-      rightPile: tiles.slice(22, 30),
+      mainPile: mainPileHeart,
+      leftPile: tiles.slice(mainPileHeart.length, mainPileHeart.length + SIDE_PILE_SIZE),
+      rightPile: tiles.slice(mainPileHeart.length + SIDE_PILE_SIZE, mainPileHeart.length + 2 * SIDE_PILE_SIZE),
       playerStack: [],
       revealedTiles: [],
       score: 0,
@@ -133,6 +177,23 @@ const App: React.FC = () => {
     return { ...tile, isMoving: true };
   };
 
+  // Update covered status for all main pile tiles
+  const updateCoveredStatus = (mainPile: Tile[]): Tile[] => {
+    // Find the highest z for each (x, y)
+    const topTiles = new Map<string, number>();
+    mainPile.forEach(tile => {
+      const key = `${tile.x},${tile.y}`;
+      if (!topTiles.has(key) || tile.z! > topTiles.get(key)!) {
+        topTiles.set(key, tile.z!);
+      }
+    });
+    return mainPile.map(tile => {
+      const key = `${tile.x},${tile.y}`;
+      const isCovered = tile.z! < topTiles.get(key)!;
+      return { ...tile, covered: isCovered };
+    });
+  };
+
   // Handle tile click from main pile with animation
   const handleMainPileClick = (index: number) => {
     if (gameState.mainPile.length === 0 || gameOver) return;
@@ -172,6 +233,9 @@ const App: React.FC = () => {
       setGameWon(true);
     }
     
+    // Update covered status for all main pile tiles
+    newState.mainPile = updateCoveredStatus(newState.mainPile);
+    
     setGameState(newState);
     
     // Clear animation flags after a delay
@@ -179,6 +243,7 @@ const App: React.FC = () => {
       setGameState(prevState => {
         const updatedState = JSON.parse(JSON.stringify(prevState)) as GameState;
         updatedState.playerStack = updatedState.playerStack.map(tile => ({...tile, isMoving: false}));
+        updatedState.mainPile = updatedState.mainPile.map(tile => ({...tile, isShuffle: false}));
         return updatedState;
       });
     }, 500);
@@ -225,6 +290,9 @@ const App: React.FC = () => {
       setGameWon(true);
     }
     
+    // Update covered status for all main pile tiles
+    newState.mainPile = updateCoveredStatus(newState.mainPile);
+    
     setGameState(newState);
     
     // Clear animation flags after a delay
@@ -232,6 +300,7 @@ const App: React.FC = () => {
       setGameState(prevState => {
         const updatedState = JSON.parse(JSON.stringify(prevState)) as GameState;
         updatedState.playerStack = updatedState.playerStack.map(tile => ({...tile, isMoving: false}));
+        updatedState.mainPile = updatedState.mainPile.map(tile => ({...tile, isShuffle: false}));
         return updatedState;
       });
     }, 500);
@@ -270,6 +339,9 @@ const App: React.FC = () => {
     // Check for matches
     checkForMatches(newState);
     
+    // Update covered status for all main pile tiles
+    newState.mainPile = updateCoveredStatus(newState.mainPile);
+    
     setGameState(newState);
     
     // Clear animation flags after a delay
@@ -277,6 +349,7 @@ const App: React.FC = () => {
       setGameState(prevState => {
         const updatedState = JSON.parse(JSON.stringify(prevState)) as GameState;
         updatedState.playerStack = updatedState.playerStack.map(tile => ({...tile, isMoving: false}));
+        updatedState.mainPile = updatedState.mainPile.map(tile => ({...tile, isShuffle: false}));
         return updatedState;
       });
     }, 500);
@@ -362,6 +435,9 @@ const App: React.FC = () => {
       newState.playerStack = [];
     }
     
+    // Update covered status for all main pile tiles
+    newState.mainPile = updateCoveredStatus(newState.mainPile);
+    
     setGameState(newState);
     setGameOver(false);
     setPowerups(prev => ({ ...prev, resurrect: prev.resurrect - 1 }));
@@ -402,6 +478,9 @@ const App: React.FC = () => {
       newState.leftPile = newState.leftPile.map(tile => ({...tile, isShuffle: true}));
       newState.rightPile = newState.rightPile.map(tile => ({...tile, isShuffle: true}));
       
+      // Update covered status for all main pile tiles
+      newState.mainPile = updateCoveredStatus(newState.mainPile);
+      
       setGameState(newState);
       setPowerups(prev => ({ ...prev, shuffle: prev.shuffle - 1 }));
       
@@ -436,6 +515,9 @@ const App: React.FC = () => {
     // Auto-arrange the remaining tiles
     newState.playerStack = autoArrangePlayerStack(newState.playerStack);
     
+    // Update covered status for all main pile tiles
+    newState.mainPile = updateCoveredStatus(newState.mainPile);
+    
     setGameState(newState);
     setPowerups(prev => ({ ...prev, remove: prev.remove - 1 }));
   };
@@ -464,6 +546,9 @@ const App: React.FC = () => {
     // Check for matches
     checkForMatches(newState);
     
+    // Update covered status for all main pile tiles
+    newState.mainPile = updateCoveredStatus(newState.mainPile);
+    
     setGameState(newState);
   };
 
@@ -476,21 +561,24 @@ const App: React.FC = () => {
         <ul>
           <li>Click tiles in the main pile to add them to your player stack (limit: {STACK_LIMIT})</li>
           <li>Take tiles from side piles when you need them</li>
-          <li>Match 3 identical tiles to remove them and score points</li>
+          <li>Match 3 identical tiles to remove them</li>
           <li>Clear all tiles without filling your stack to win!</li>
         </ul>
       </div>
       
-      <div className="score-board">
-        <div>Score: {gameState.score}</div>
-        <div>Stack: {gameState.playerStack.length}/{gameState.stackLimit}</div>
-        <div>Matches: {gameState.matchesFound}</div>
-      </div>
+      {!gameWon && !gameOver && (
+        <div className="score-board" style={{ visibility: 'hidden' }}>
+          <div>Score: {gameState.score}</div>
+          <div>Stack: {gameState.playerStack.length}/{gameState.stackLimit}</div>
+          <div>Matches: {gameState.matchesFound}</div>
+        </div>
+      )}
       
       {gameOver && !gameWon && (
         <div className="game-over">
           <h2>Game Over!</h2>
           <p>Your stack is full.</p>
+          <p>Triplets cleared: {gameState.matchesFound} ({Math.round((gameState.matchesFound / 100) * 100)}%)</p>
           {powerups.resurrect > 0 && (
             <button 
               className="resurrect-button" 
@@ -507,7 +595,7 @@ const App: React.FC = () => {
       {gameWon && (
         <div className="game-won">
           <h2>You Win!</h2>
-          <p>Congratulations! You cleared all the tiles.</p>
+          <p>Triplets cleared: {gameState.matchesFound} ({Math.round((gameState.matchesFound / 100) * 100)}%)</p>
           <button onClick={startNewGame}>Play Again</button>
         </div>
       )}
